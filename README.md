@@ -1,6 +1,8 @@
 lab-eigenfaces
 ==============
 
+Face recognition algorithm implementation, using the eigenfaces technique.
+
 # Required environment
 
  * MATLAB v9
