@@ -5,7 +5,7 @@ Face recognition algorithm implementation, using the eigenfaces technique.
 
 # Required environment
 
- * MATLAB v9
+ * MATLAB v9+
 
 # How to use
 
