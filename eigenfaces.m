@@ -6,8 +6,8 @@
 function eigenfaces()
     clear;
     
-    image_max_width = 46;
-    image_max_height = 56;
+    image_max_width = 92;
+    image_max_height = 112;
     
     % First, train the database
     [database_sets, database_set_images, database_images, database_eigenfaces, database_mean_face, database_weights] = eigenfaces__train(image_max_width, image_max_height);
