@@ -4,14 +4,16 @@
 % ---------------------------------------
 
 function eigenfaces()
+    clear;
+    
     % First, train the database
-    [database_sets, database_set_images, database_eigenfaces, database_mean_face, database_weights] = eigenfaces__train();
+    [database_sets, database_set_images, database_images, database_eigenfaces, database_mean_face, database_weights] = eigenfaces__train();
     
     % Then, use the database to classify faces
-    eigenfaces__recognize(database_sets, database_set_images, database_eigenfaces, database_mean_face, database_weights);
+    eigenfaces__recognize(database_sets, database_set_images, database_images, database_eigenfaces, database_mean_face, database_weights);
 end
 
-function [database_sets, database_set_images, database_eigenfaces, database_mean_face, database_weights]=eigenfaces__train()
+function [database_sets, database_set_images, database_images, database_eigenfaces, database_mean_face, database_weights]=eigenfaces__train()
     disp('> Training started...');
     tic();
     
@@ -30,6 +32,8 @@ function [database_sets, database_set_images, database_eigenfaces, database_mean
     
     % Covariance matrix
     covariance_matrix = eigenfaces__process_covariance_matrix(images_phi);
+    
+    % TODO: reduce covariance matrix to MxM (if not already done?!)
     
     % Eigenvectors
     eigenvectors = eigenfaces__process_eigenvectors(covariance_matrix);
@@ -51,12 +55,13 @@ function [database_sets, database_set_images, database_eigenfaces, database_mean
     
     database_sets = sets;
     database_set_images = set_images;
+    database_images = images;
     database_eigenfaces = eigenfaces;
     database_mean_face = image_psi;
     database_weights = weights;
 end
 
-function eigenfaces__recognize(database_sets, database_set_images, database_eigenfaces, database_mean_face, database_weights)
+function eigenfaces__recognize(database_sets, database_set_images, database_images, database_eigenfaces, database_mean_face, database_weights)
     disp('> Recognition started...');
     tic();
     
@@ -64,9 +69,11 @@ function eigenfaces__recognize(database_sets, database_set_images, database_eige
     
     disp(sprintf('Loaded %i images of %ix%i pixels', image_count, image_width, image_height));
     
+    results_all = [];
+    
     % Iterate on every image in the recognition set
     for i = 1:image_count
-        image = images(((i - 1) * image_height + 1):(i * image_height), :);
+        image = eigenfaces__util_image_from_vector(images, image_height, image_width, i);
         
         % Normalized face vectors: GAMMA(i){n} [GAMMA(1), GAMMA(2), ...]
         image_gamma = eigenfaces__normalize(image, image_height, image_width, 1);
@@ -86,15 +93,26 @@ function eigenfaces__recognize(database_sets, database_set_images, database_eige
         farthest_weight = max(distances);
         
         if eigenfaces__process_is_match(closest_weight, distances) == true
+            result = closest_index;
+            
             fprintf('HIT: %s/%s recognized as subject in set %s/%s\n', sets{i}, set_images{i}, database_sets{closest_index}, database_set_images{closest_index});
+            
         elseif eigenfaces__process_is_face(closest_weight, distances) == true
+            result = 0;
+            
             fprintf('MISS: %s/%s not found in any set\n', sets{i}, set_images{i});
         else
+            result = -1;
+            
             fprintf('ERROR: %s/%s may not be an human face\n', sets{i}, set_images{i});
         end
         
+        results_all(i) = result;
+        
         fprintf('Got weights: closest=%i; farthest=%i\n', closest_weight, farthest_weight);
     end
+    
+    eigenfaces__util_recognition_show(images, database_images, sets, database_sets, results_all, image_height, image_width, image_count);
     
     fprintf('Processing time: %f seconds\n', toc());
     disp('> Recognition ended.');
@@ -274,6 +292,44 @@ function is_face=eigenfaces__process_is_face(distance, distances)
     if distance < threshold
         is_face = true;
     end
+end
+
+function eigenfaces__util_recognition_show(images, database_images, sets, database_sets, results_all, image_height, image_width, image_count)
+    figure;
+    
+    plot_grid_width = 2;
+    plot_grid_height = image_count;
+    
+    for i = 1:image_count
+        image = eigenfaces__util_image_from_vector(images, image_height, image_width, i);
+        
+        % Show input image {i}
+        subplot(plot_grid_height, plot_grid_width, 2 * i - 1);
+        imshow(image, 'DisplayRange', [0 255]);
+        title(sprintf('Input is %s', sets{i}));
+        
+        result_image_compare = zeros(image_height, image_width);
+        result_index = results_all(i);
+        
+        if result_index > 0
+            result_image_compare = eigenfaces__util_image_from_vector(database_images, image_height, image_width, result_index);
+        end
+        
+        subplot(plot_grid_height, plot_grid_width, 2 * i);
+        imshow(result_image_compare, 'DisplayRange', [0 255]);
+        
+        if result_index > 0
+            title(sprintf('Recognized as %s', database_sets{result_index}));
+        elseif result_index == 0
+            title('Not found');
+        else
+            title('Not a face');
+        end
+    end
+end
+
+function image=eigenfaces__util_image_from_vector(image_vector, image_height, image_width, image_index)
+    image = image_vector(((image_index - 1) * image_height + 1):(image_index * image_height), :);
 end
 
 function image=eigenfaces__util_images_matrix_from_vector(image_vector, image_height, image_width)
