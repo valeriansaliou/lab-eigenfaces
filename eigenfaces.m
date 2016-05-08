@@ -33,8 +33,6 @@ function [database_sets, database_set_images, database_images, database_eigenfac
     % Covariance matrix
     covariance_matrix = eigenfaces__process_covariance_matrix(images_phi);
     
-    % TODO: reduce covariance matrix to MxM (if not already done?!)
-    
     % Eigenvectors
     eigenvectors = eigenfaces__process_eigenvectors(covariance_matrix);
     
