@@ -17,7 +17,7 @@ function [database_sets, database_set_images, database_images, database_eigenfac
     disp('> Training started...');
     tic();
     
-    [sets, set_images, images, image_height, image_width, image_count] = eigenfaces__load_images('training_set', 'pgm');
+    [sets, set_images, images, image_height, image_width, image_count] = eigenfaces__load_images('training_set');
     
     disp(sprintf('Loaded %i images of %ix%i pixels', image_count, image_width, image_height));
     
@@ -63,7 +63,7 @@ function eigenfaces__recognize(database_sets, database_set_images, database_imag
     disp('> Recognition started...');
     tic();
     
-    [sets, set_images, images, image_height, image_width, image_count] = eigenfaces__load_images('recognition_set', 'pgm');
+    [sets, set_images, images, image_height, image_width, image_count] = eigenfaces__load_images('recognition_set');
     
     disp(sprintf('Loaded %i images of %ix%i pixels', image_count, image_width, image_height));
     
@@ -116,7 +116,7 @@ function eigenfaces__recognize(database_sets, database_set_images, database_imag
     disp('> Recognition ended.');
 end
 
-function [sets, set_images, images, image_height, image_width, image_count]=eigenfaces__load_images(image_set, image_extension)
+function [sets, set_images, images, image_height, image_width, image_count]=eigenfaces__load_images(image_set)
     sets = cell(0, 1);
     set_images = cell(0, 1);
     images = [];
@@ -124,8 +124,10 @@ function [sets, set_images, images, image_height, image_width, image_count]=eige
     image_width = 0;
     image_count = 0;
     
+    image_extension = 'pgm';
+    
     % List classes
-    directory_name = sprintf('/Users/valerian/Documents/ENSSAT/Imaging/Face Recognition/eigenfaces/%s/active', image_set);
+    directory_name = sprintf('./%s/active', image_set);
     class_dirs = dir(directory_name);
     class_index = find([class_dirs.isdir]);
 
@@ -142,7 +144,7 @@ function [sets, set_images, images, image_height, image_width, image_count]=eige
             
             image_name = image_files(image_index(i)).name;
             image_path = fullfile(class_path, image_name);
-            
+
             current_image = imread(image_path);
             
             if image_extension ~= 'pgm'
@@ -270,9 +272,10 @@ function is_match=eigenfaces__process_is_match(distance, distances)
     % @ref: http://matlabsproj.blogspot.com/2012/06/face-recognition-using-eigenfaces_11.html
     % @see: Thresholds for Eigenface Recognition
     
-    threshold = 1;  % This one is set empirically (FIXME)
+    threshold_factor = 1 / 4;  % This one is set empirically (FIXME)
+    threshold = threshold_factor * max(distances);
     
-    if distance < threshold
+    if distance == min(distances) && distance < threshold
         is_match = true;
     end
 end
