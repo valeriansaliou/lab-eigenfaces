@@ -6,18 +6,21 @@
 function eigenfaces()
     clear;
     
+    image_max_width = 46;
+    image_max_height = 56;
+    
     % First, train the database
-    [database_sets, database_set_images, database_images, database_eigenfaces, database_mean_face, database_weights] = eigenfaces__train();
+    [database_sets, database_set_images, database_images, database_eigenfaces, database_mean_face, database_weights] = eigenfaces__train(image_max_width, image_max_height);
     
     % Then, use the database to classify faces
-    eigenfaces__recognize(database_sets, database_set_images, database_images, database_eigenfaces, database_mean_face, database_weights);
+    eigenfaces__recognize(image_max_width, image_max_height, database_sets, database_set_images, database_images, database_eigenfaces, database_mean_face, database_weights);
 end
 
-function [database_sets, database_set_images, database_images, database_eigenfaces, database_mean_face, database_weights]=eigenfaces__train()
+function [database_sets, database_set_images, database_images, database_eigenfaces, database_mean_face, database_weights]=eigenfaces__train(image_max_width, image_max_height)
     disp('> Training started...');
     tic();
     
-    [sets, set_images, images, image_height, image_width, image_count] = eigenfaces__load_images('training_set');
+    [sets, set_images, images, image_height, image_width, image_count] = eigenfaces__load_images('training_set', image_max_width, image_max_height);
     
     disp(sprintf('Loaded %i images of %ix%i pixels', image_count, image_width, image_height));
     
@@ -36,17 +39,13 @@ function [database_sets, database_set_images, database_images, database_eigenfac
     % Eigenvectors
     eigenvectors = eigenfaces__process_eigenvectors(covariance_matrix);
     
-    % TODO: use eigenvalues returned by <eigenfaces__process_eigenvectors> to
-    % trim down to eigenvectors for highest eigenvalues (IF USING A LARGE
-    % TRAINING SET)
-    
     % Eigenfaces
-    eigenfaces = eigenfaces__process_eigenfaces(eigenvectors, images_phi, image_height, image_width, image_count);
+    eigenfaces = eigenfaces__process_eigenfaces(eigenvectors, images_phi, image_height, image_width);
     
     % Weights
     weights = eigenfaces__process_weights(eigenfaces, images_phi, image_count);
 
-    %eigenfaces__util_images_show(eigenfaces, image_height, image_width, image_count);
+    %eigenfaces__util_images_show(eigenfaces, image_height, image_width, size(eigenfaces, 1));
     
     fprintf('Processing time: %f seconds\n', toc());
     disp('> Training ended.');
@@ -59,17 +58,17 @@ function [database_sets, database_set_images, database_images, database_eigenfac
     database_weights = weights;
 end
 
-function eigenfaces__recognize(database_sets, database_set_images, database_images, database_eigenfaces, database_mean_face, database_weights)
+function eigenfaces__recognize(image_max_width, image_max_height, database_sets, database_set_images, database_images, database_eigenfaces, database_mean_face, database_weights)
     disp('> Recognition started...');
     tic();
     
-    [sets, set_images, images, image_height, image_width, image_count] = eigenfaces__load_images('recognition_set');
+    [sets, set_images, images, image_height, image_width, image_count] = eigenfaces__load_images('recognition_set', image_max_width, image_max_height);
     
     disp(sprintf('Loaded %i images of %ix%i pixels', image_count, image_width, image_height));
     
-    results_all = [];
+    distances_all = [];
     
-    % Iterate on every image in the recognition set
+    % Iterate on every image in the recognition set (build distances)
     for i = 1:image_count
         image = eigenfaces__util_image_from_vector(images, image_height, image_width, i);
         
@@ -87,15 +86,29 @@ function eigenfaces__recognize(database_sets, database_set_images, database_imag
         % Distances
         distances = eigenfaces__process_distances(weights, database_weights);
         
+        distances_all(i, :) = distances;
+    end
+    
+    % Vectorize minimum distances
+    minimum_distances = min(distances_all');
+    
+    % Take a decision (build results)
+    results_all = [];
+    
+    for i = 1:image_count
+        distances = distances_all(i, :);
+        
         [closest_weight, closest_index] = min(distances);
         farthest_weight = max(distances);
         
-        if eigenfaces__process_is_match(closest_weight, distances) == true
+        [is_face, is_match]=eigenfaces__process_matcher(closest_weight, minimum_distances);
+        
+        if is_match == true
             result = closest_index;
             
             fprintf('HIT: %s/%s recognized as subject in set %s/%s\n', sets{i}, set_images{i}, database_sets{closest_index}, database_set_images{closest_index});
             
-        elseif eigenfaces__process_is_face(closest_weight, distances) == true
+        elseif is_face == true
             result = 0;
             
             fprintf('MISS: %s/%s not found in any set\n', sets{i}, set_images{i});
@@ -116,7 +129,7 @@ function eigenfaces__recognize(database_sets, database_set_images, database_imag
     disp('> Recognition ended.');
 end
 
-function [sets, set_images, images, image_height, image_width, image_count]=eigenfaces__load_images(image_set)
+function [sets, set_images, images, image_height, image_width, image_count]=eigenfaces__load_images(image_set, image_max_width, image_max_height)
     sets = cell(0, 1);
     set_images = cell(0, 1);
     images = [];
@@ -147,8 +160,20 @@ function [sets, set_images, images, image_height, image_width, image_count]=eige
 
             current_image = imread(image_path);
             
+            % Convert to grayscale?
             if image_extension ~= 'pgm'
                 current_image = rgb2gray(current_image);
+            end
+            
+            % Resize? (if Image Processing Toolbox is available)
+            if exist('imresize') == 2
+                if size(current_image, 1) > image_max_height
+                    current_image = imresize(current_image, [image_max_height NaN]);
+                end
+
+                if size(current_image, 2) > image_max_width
+                    current_image = imresize(current_image, [NaN image_max_width]);
+                end
             end
             
             images = cat(1, images, current_image);
@@ -164,16 +189,9 @@ function [sets, set_images, images, image_height, image_width, image_count]=eige
 end
 
 function images_gamma=eigenfaces__normalize(images, image_height, image_width, image_count)
-    images = eigenfaces__normalize_resize(images);
     images = eigenfaces__normalize_vector_project(images, image_height, image_width, image_count);
-    images = eigenfaces__normalize_color_adjust(images);
-    images = eigenfaces__normalize_position_adjust(images);
-    
-    images_gamma = images;
-end
 
-function images=eigenfaces__normalize_resize(images)
-    % TODO
+    images_gamma = images;
 end
 
 function images_vector=eigenfaces__normalize_vector_project(images, image_height, image_width, image_count)
@@ -186,14 +204,6 @@ function images_vector=eigenfaces__normalize_vector_project(images, image_height
         
         images_vector(i, :) = image_vector;
     end
-end
-
-function images=eigenfaces__normalize_color_adjust(images)
-    % TODO
-end
-
-function images=eigenfaces__normalize_position_adjust(images)
-    % TODO
 end
 
 function image_psi=eigenfaces__mean(images, image_height, image_width, image_count)
@@ -221,16 +231,30 @@ end
 function [eigenvectors, eigenvalues]=eigenfaces__process_eigenvectors(covariance_matrix)
     [eigenvectors, eigenvalues] = eig(covariance_matrix);
     
+    % Adjust eigenvectors + eigenvalues working sets
     eigenvectors = fliplr(eigenvectors);
     
     eigenvalues = diag(eigenvalues);
     eigenvalues = eigenvalues(end:-1:1);
+    
+    % Pick 15% largest eigenvalues, and split eigenvectors accordingly
+    % @see: http://globaljournals.org/GJCST_Volume10/gjcst_vol10_issue_1_paper10.pdf
+    % @ref: Page 1
+    split_factor = 0.15;
+    split_limit = ceil(size(eigenvectors, 1) * split_factor);
+    
+    if split_limit < 1
+        split_limit = 1;
+    end
+    
+    eigenvectors = eigenvectors(:, 1:split_limit);
+    eigenvalues = eigenvalues(1:split_limit, 1);
 end
 
-function eigenfaces=eigenfaces__process_eigenfaces(eigenvectors, images_phi, image_height, image_width, image_count)
+function eigenfaces=eigenfaces__process_eigenfaces(eigenvectors, images_phi, image_height, image_width)
     % Multiply {ith} eigenvectors by the whole normalized image set
     % This gives the {ith} eigenface
-    for i = 1:image_count
+    for i = 1:size(eigenvectors, 2)
         eigenfaces(i, :) = eigenvectors(:, i)' * images_phi;
     end
     
@@ -238,7 +262,7 @@ function eigenfaces=eigenfaces__process_eigenfaces(eigenvectors, images_phi, ima
     pixel_min = min(min(eigenfaces));
     pixel_max = max(max(eigenfaces));
     
-    for i = 1:image_count
+    for i = 1:size(eigenfaces, 1)
         for p = 1:(image_height * image_width)
             eigenfaces(i, p) = 255 * (eigenfaces(i, p) - pixel_min) / (pixel_max - pixel_min);
         end
@@ -265,33 +289,27 @@ function distances=eigenfaces__process_distances(weights, database_weigths)
     end
 end
 
-function is_match=eigenfaces__process_is_match(distance, distances)
+function [is_face, is_match]=eigenfaces__process_matcher(distance, minimum_distances)
+    % Dynamic threshold processing, based on maximum value of the set of
+    % minimum distances
+    % Ignore values above a certain 'non-face' threshold: this avoids non-human
+    % objects to mess-up the recognition algorithm results
+    % @see: http://globaljournals.org/GJCST_Volume10/gjcst_vol10_issue_1_paper10.pdf
+    % @ref: Page 3
+    
+    is_face = false;
     is_match = false;
     
-    % TODO: dynamic error / threshold calculation
-    % @ref: http://matlabsproj.blogspot.com/2012/06/face-recognition-using-eigenfaces_11.html
-    % @see: Thresholds for Eigenface Recognition
+    non_face_threshold = 1.0e008;
     
-    threshold_factor = 1 / 4;  % This one is set empirically (FIXME)
-    threshold = threshold_factor * max(distances);
-    
-    if distance == min(distances) && distance < threshold
-        is_match = true;
-    end
-end
-
-function is_face=eigenfaces__process_is_face(distance, distances)
-    is_face = false;
-    
-    % TODO: dynamic error / threshold calculation
-    % @ref: http://matlabsproj.blogspot.com/2012/06/face-recognition-using-eigenfaces_11.html
-    % @see: Thresholds for Eigenface Recognition
-    
-    threshold_factor = 1 / 4;  % This one is set empirically (FIXME)
-    threshold = threshold_factor * max(distances);
-    
-    if distance < threshold
+    if distance < non_face_threshold
         is_face = true;
+        
+        non_match_threshold = 0.8 * max(minimum_distances(minimum_distances < non_face_threshold));
+
+        if distance < non_match_threshold
+            is_match = true;
+        end
     end
 end
 
