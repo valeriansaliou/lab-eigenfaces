@@ -180,9 +180,19 @@ function [sets, set_images, images, image_height, image_width, image_count]=eige
             
             sets{image_count} = [class_name];
             set_images{image_count} = [image_name];
+            
+            [current_image_height, current_image_width] = size(current_image);
 
             if i == 1
-                [image_height, image_width] = size(current_image);
+                % First image size is reference size
+                image_height = current_image_height;
+                image_width = current_image_width;
+            else
+                % Check next images size matches that of first image (all
+                % images MUST have the sa~me size)
+                if current_image_height ~= image_height || current_image_width ~= image_width
+                    throw(MException('MYFUN:image_size', 'Images must all have the same size'));
+                end
             end
         end
     end
