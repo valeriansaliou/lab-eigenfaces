@@ -37,18 +37,18 @@ function [database_sets, database_set_images, database_images, database_eigenfac
     covariance_matrix = eigenfaces__process_covariance_matrix(images_phi);
     
     % Eigenvectors
-    eigenvectors = eigenfaces__process_eigenvectors(covariance_matrix);
+    eigenvectors = eigenfaces__process_eigenvectors(covariance_matrix, image_count);
     
     % Eigenfaces
     eigenfaces = eigenfaces__process_eigenfaces(eigenvectors, images_phi, image_height, image_width);
     
     % Weights
     weights = eigenfaces__process_weights(eigenfaces, images_phi, image_count);
-
-    %eigenfaces__util_images_show(eigenfaces, image_height, image_width, size(eigenfaces, 1));
     
     fprintf('Processing time: %f seconds\n', toc());
     disp('> Training ended.');
+    
+    %eigenfaces__util_images_show(eigenfaces, image_height, image_width, size(eigenfaces, 1));
     
     database_sets = sets;
     database_set_images = set_images;
@@ -123,7 +123,7 @@ function eigenfaces__recognize(image_max_width, image_max_height, database_sets,
         fprintf('Got weights: closest=%i; farthest=%i\n', closest_weight, farthest_weight);
     end
     
-    eigenfaces__util_recognition_show(images, database_images, sets, database_sets, results_all, image_height, image_width, image_count);
+    %eigenfaces__util_recognition_show(images, database_images, sets, database_sets, results_all, image_height, image_width, image_count);
     
     fprintf('Processing time: %f seconds\n', toc());
     disp('> Recognition ended.');
@@ -236,7 +236,7 @@ function covariance_matrix=eigenfaces__process_covariance_matrix(images_phi)
     %covariance_matrix = images_phi * images_phi';
 end
 
-function [eigenvectors, eigenvalues]=eigenfaces__process_eigenvectors(covariance_matrix)
+function [eigenvectors, eigenvalues]=eigenfaces__process_eigenvectors(covariance_matrix, image_count)
     [eigenvectors, eigenvalues] = eig(covariance_matrix);
     
     % Adjust eigenvectors + eigenvalues working sets
@@ -248,12 +248,14 @@ function [eigenvectors, eigenvalues]=eigenfaces__process_eigenvectors(covariance
     % Pick 15% largest eigenvalues, and split eigenvectors accordingly
     % @see: http://globaljournals.org/GJCST_Volume10/gjcst_vol10_issue_1_paper10.pdf
     % @ref: Page 1
-    split_factor = 0.15;
-    split_limit = ceil(size(eigenvectors, 1) * split_factor);
-    
-    if split_limit < 1
-        split_limit = 1;
-    end
+%     split_factor = 0.15;
+%     split_limit = ceil(size(eigenvectors, 1) * split_factor);
+%     
+%     if split_limit < 1
+%         split_limit = 1;
+%     end
+
+    split_limit = image_count;
     
     eigenvectors = eigenvectors(:, 1:split_limit);
     eigenvalues = eigenvalues(1:split_limit, 1);
@@ -262,19 +264,20 @@ end
 function eigenfaces=eigenfaces__process_eigenfaces(eigenvectors, images_phi, image_height, image_width)
     % Multiply {ith} eigenvectors by the whole normalized image set
     % This gives the {ith} eigenface
-    for i = 1:size(eigenvectors, 2)
-        eigenfaces(i, :) = eigenvectors(:, i)' * images_phi';
-    end
+    disp(size(images_phi));
+    disp(size(eigenvectors));
+    
+    eigenfaces = eigenvectors * images_phi;
     
     % Normalize pixels from 0 to 255
-    pixel_min = min(min(eigenfaces));
-    pixel_max = max(max(eigenfaces));
-    
-    for i = 1:size(eigenfaces, 1)
-        for p = 1:(image_height * image_width)
-            eigenfaces(i, p) = 255 * (eigenfaces(i, p) - pixel_min) / (pixel_max - pixel_min);
-        end
-    end
+%     pixel_min = min(min(eigenfaces));
+%     pixel_max = max(max(eigenfaces));
+%     
+%     for i = 1:size(eigenfaces, 1)
+%         for p = 1:(image_height * image_width)
+%             eigenfaces(i, p) = 255 * (eigenfaces(i, p) - pixel_min) / (pixel_max - pixel_min);
+%         end
+%     end
 end
 
 function weights=eigenfaces__process_weights(eigenfaces, images_phi, image_count)
