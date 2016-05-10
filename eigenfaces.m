@@ -6,8 +6,8 @@
 function eigenfaces()
     clear;
     
-    image_max_width = 92;
-    image_max_height = 112;
+    image_max_width = 46;
+    image_max_height = 56;
     
     % First, train the database
     [database_sets, database_set_images, database_images, database_eigenfaces, database_mean_face, database_weights] = eigenfaces__train(image_max_width, image_max_height);
@@ -166,14 +166,8 @@ function [sets, set_images, images, image_height, image_width, image_count]=eige
             end
             
             % Resize? (if Image Processing Toolbox is available)
-            if exist('imresize') == 2
-                if size(current_image, 1) > image_max_height
-                    current_image = imresize(current_image, [image_max_height NaN]);
-                end
-
-                if size(current_image, 2) > image_max_width
-                    current_image = imresize(current_image, [NaN image_max_width]);
-                end
+            if size(current_image, 1) > image_max_height || size(current_image, 2) > image_max_width
+                current_image = eigenfaces__util_image_resize(current_image, image_max_width, image_max_height);
             end
             
             images = cat(1, images, current_image);
@@ -235,7 +229,11 @@ function images_phi=eigenfaces__mean_substract(images_gamma, image_psi, image_he
 end
 
 function covariance_matrix=eigenfaces__process_covariance_matrix(images_phi)
-    covariance_matrix = images_phi * images_phi';
+    % Slow, but accurate method
+    covariance_matrix = cov(images_phi);
+    
+    % Fast method
+    %covariance_matrix = images_phi * images_phi';
 end
 
 function [eigenvectors, eigenvalues]=eigenfaces__process_eigenvectors(covariance_matrix)
@@ -265,7 +263,7 @@ function eigenfaces=eigenfaces__process_eigenfaces(eigenvectors, images_phi, ima
     % Multiply {ith} eigenvectors by the whole normalized image set
     % This gives the {ith} eigenface
     for i = 1:size(eigenvectors, 2)
-        eigenfaces(i, :) = eigenvectors(:, i)' * images_phi;
+        eigenfaces(i, :) = eigenvectors(:, i)' * images_phi';
     end
     
     % Normalize pixels from 0 to 255
@@ -379,4 +377,32 @@ function eigenfaces__util_images_show(images, image_height, image_width, image_c
     end
     
     imshow(images_matrix, 'DisplayRange', [0 255]);
+end
+
+function resized_image=eigenfaces__util_image_resize(image, target_width, target_height)
+    % Modified snippet from: http://stackoverflow.com/questions/6183155/resizing-an-image-in-matlab
+    % Prevents using imresize(), which requires Image Processing Toolbox
+
+    scale_zoom = 1;
+  
+	if size(image, 1) > target_width
+        scale_zoom = target_width / size(image, 1);
+    end
+    
+	if size(image, 2) > target_height
+        scale_zoom = target_height / size(image, 1);
+    end
+
+	old_size = size(image);
+	new_size = max(floor(scale_zoom .* old_size(1:2)), 1);
+    
+	new_x = ((1:new_size(2)) - 0.5) ./ scale_zoom + 0.5;
+	new_y = ((1:new_size(1)) - 0.5) ./ scale_zoom + 0.5;
+    
+	old_class = class(image);
+    
+	image = double(image);
+
+	resized_image = interp2(image, new_x, new_y(:), 'cubic');
+	resized_image = cast(resized_image, old_class);
 end
