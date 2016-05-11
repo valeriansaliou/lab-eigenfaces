@@ -49,7 +49,7 @@ function [database_sets, database_set_images, database_images, database_eigenfac
     % Weights
     weights = eigenfaces__process_weights(eigenfaces, images_phi, image_count);
     
-    % Uncomment this to view PHI images
+    % Uncomment this to view first eigenfaces
     %eigenfaces__util_images_show(eigenfaces(1:10, :), image_height, image_width, size(eigenfaces(1:10, :), 1));
     
     fprintf('Processing time: %f seconds\n', toc());
@@ -296,9 +296,6 @@ function [results_all, mean_time]=eigenfaces__process_recognizer(database_sets, 
         % Substracted mean face vectors: PHI(i) [PHI(1), PHI(2), ...]
         image_phi = eigenfaces__mean_substract(image_gamma, database_mean_face, image_height, image_width, 1);
 
-        % Uncomment this to view PHI images
-        %eigenfaces__util_images_show(image_phi, image_height, image_width, 1);
-        
         % Weights
         weights = eigenfaces__process_weights(database_eigenfaces, image_phi, 1);
 
