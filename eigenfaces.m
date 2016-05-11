@@ -15,6 +15,9 @@ function eigenfaces()
     
     % Then, use the database to classify faces
     eigenfaces__recognize(image_max_width, image_max_height, database_sets, database_set_images, database_images, database_eigenfaces, database_mean_face, database_weights);
+    
+    % Process validation
+    eigenfaces__validation(database_sets, database_set_images, database_images, database_eigenfaces, database_mean_face, database_weights);
 end
 
 function [database_sets, database_set_images, database_images, database_eigenfaces, database_mean_face, database_weights]=eigenfaces__train(image_max_width, image_max_height)
@@ -41,7 +44,7 @@ function [database_sets, database_set_images, database_images, database_eigenfac
     eigenvectors = eigenfaces__process_eigenvectors(covariance_matrix, image_count);
     
     % Eigenfaces
-    eigenfaces = eigenfaces__process_eigenfaces(eigenvectors, images_phi);
+    eigenfaces = eigenfaces__process_eigenfaces(eigenvectors);
    
     % Weights
     weights = eigenfaces__process_weights(eigenfaces, images_phi, image_count);
@@ -130,6 +133,18 @@ function eigenfaces__recognize(image_max_width, image_max_height, database_sets,
     
     fprintf('Processing time: %f seconds\n', toc());
     disp('> Recognition ended.');
+end
+
+function eigenfaces__validation(image_max_width, image_max_height, database_sets, database_set_images, database_images, database_eigenfaces, database_mean_face, database_weights)
+    disp('> Validation started...');
+    tic();
+    
+    % TODO: validate the quality of implementation
+    %  -> error rate
+    %  -> speed per recognition unit
+    
+    fprintf('Processing time: %f seconds\n', toc());
+    disp('> Validation ended.');
 end
 
 function [sets, set_images, images, image_height, image_width, image_count]=eigenfaces__load_images(image_set, image_max_width, image_max_height)
@@ -259,7 +274,7 @@ function [eigenvectors, eigenvalues]=eigenfaces__process_eigenvectors(covariance
     eigenvalues = eigenvalues(1:split_limit, 1);
 end
 
-function eigenfaces=eigenfaces__process_eigenfaces(eigenvectors, images_phi)
+function eigenfaces=eigenfaces__process_eigenfaces(eigenvectors)
     % Eigenfaces is another word for eigenvectors
     eigenfaces = eigenvectors;
 end
