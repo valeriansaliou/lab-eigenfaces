@@ -93,12 +93,13 @@ function eigenfaces__validation(image_max_width, image_max_height, database_sets
     fprintf('Loaded %i images of %ix%i pixels\n', image_count, image_width, image_height);
     
     % Proceed recognition
-    results_all = eigenfaces__process_recognizer(database_sets, database_set_images, database_eigenfaces, database_mean_face, database_weights, images, sets, set_images, image_height, image_width, image_count);
+    [results_all, mean_time] = eigenfaces__process_recognizer(database_sets, database_set_images, database_eigenfaces, database_mean_face, database_weights, images, sets, set_images, image_height, image_width, image_count);
     
     % Process error ratio
-    [error_ratio, error_status] = eigenfaces__util_error_ratio(results_all, sets, database_sets, image_count);
+    error_ratio = eigenfaces__util_error_ratio(results_all, sets, database_sets, image_count);
     
-    fprintf('Error ratio of: %f percent (status: %s)\n', error_ratio, error_status);
+    fprintf('Mean time per recognition cycle: %f seconds\n', mean_time);
+    fprintf('Error ratio of: %f percent\n', error_ratio);
     
     fprintf('Processing time: %f seconds\n', toc());
     disp('> Validation ended.');
@@ -280,7 +281,9 @@ function [is_face, is_match]=eigenfaces__process_matcher(distance, minimum_dista
     end
 end
 
-function results_all=eigenfaces__process_recognizer(database_sets, database_set_images, database_eigenfaces, database_mean_face, database_weights, images, sets, set_images, image_height, image_width, image_count)
+function [results_all, mean_time]=eigenfaces__process_recognizer(database_sets, database_set_images, database_eigenfaces, database_mean_face, database_weights, images, sets, set_images, image_height, image_width, image_count)
+    tic();
+    
     distances_all = [];
     
     % Iterate on every image in the recognition set (build distances)
@@ -338,10 +341,11 @@ function results_all=eigenfaces__process_recognizer(database_sets, database_set_
         
         fprintf('Got weights: closest=%i; farthest=%i\n', closest_weight, farthest_weight);
     end
+    
+    mean_time = toc() / image_count;
 end
 
-function [error_ratio, error_status]=eigenfaces__util_error_ratio(results_all, sets, database_sets, image_count)
-    error_ratio_threshold = 5;
+function error_ratio=eigenfaces__util_error_ratio(results_all, sets, database_sets, image_count)
     error_count = 0;
     
     % Find errors
@@ -358,12 +362,6 @@ function [error_ratio, error_status]=eigenfaces__util_error_ratio(results_all, s
     
     % Process ratio
     error_ratio = (error_count / image_count) * 100;
-    
-    if error_ratio >= error_ratio_threshold
-        error_status = 'bad';
-    else
-        error_status = 'good';
-    end
 end
 
 function eigenfaces__util_recognition_show(images, database_images, sets, database_sets, results_all, image_height, image_width, image_count)
