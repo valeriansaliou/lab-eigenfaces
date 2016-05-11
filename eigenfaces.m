@@ -158,7 +158,7 @@ function [sets, set_images, images, image_height, image_width, image_count]=eige
     image_extension = 'pgm';
     
     % List classes
-    directory_name = sprintf('./%s/active', image_set);
+    directory_name = sprintf('./%s', image_set);
     class_dirs = dir(directory_name);
     class_index = find([class_dirs.isdir]);
 
