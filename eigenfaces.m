@@ -17,7 +17,7 @@ function eigenfaces()
     eigenfaces__recognize(image_max_width, image_max_height, database_sets, database_set_images, database_images, database_eigenfaces, database_mean_face, database_weights);
     
     % Process validation
-    eigenfaces__validation(database_sets, database_set_images, database_images, database_eigenfaces, database_mean_face, database_weights);
+    eigenfaces__validation(image_max_width, image_max_height, database_sets, database_set_images, database_images, database_eigenfaces, database_mean_face, database_weights);
 end
 
 function [database_sets, database_set_images, database_images, database_eigenfaces, database_mean_face, database_weights]=eigenfaces__train(image_max_width, image_max_height)
@@ -26,7 +26,7 @@ function [database_sets, database_set_images, database_images, database_eigenfac
     
     [sets, set_images, images, image_height, image_width, image_count] = eigenfaces__load_images('training_set', image_max_width, image_max_height);
     
-    disp(sprintf('Loaded %i images of %ix%i pixels', image_count, image_width, image_height));
+    fprintf('Loaded %i images of %ix%i pixels\n', image_count, image_width, image_height);
     
     % Normalized face vectors: GAMMA(i){n} [GAMMA(1), GAMMA(2), ...]
     images_gamma = eigenfaces__normalize(images, image_height, image_width, image_count);
@@ -69,65 +69,10 @@ function eigenfaces__recognize(image_max_width, image_max_height, database_sets,
     
     [sets, set_images, images, image_height, image_width, image_count] = eigenfaces__load_images('recognition_set', image_max_width, image_max_height);
     
-    disp(sprintf('Loaded %i images of %ix%i pixels', image_count, image_width, image_height));
+    fprintf('Loaded %i images of %ix%i pixels\n', image_count, image_width, image_height);
     
-    distances_all = [];
-    
-    % Iterate on every image in the recognition set (build distances)
-    for i = 1:image_count
-        image = eigenfaces__util_image_from_vector(images, image_height, image_width, i);
-        
-        % Normalized face vectors: GAMMA(i){n} [GAMMA(1), GAMMA(2), ...]
-        image_gamma = eigenfaces__normalize(image, image_height, image_width, 1);
-
-        % Substracted mean face vectors: PHI(i) [PHI(1), PHI(2), ...]
-        image_phi = eigenfaces__mean_substract(image_gamma, database_mean_face, image_height, image_width, 1);
-
-        % Uncomment this to view PHI images
-        %eigenfaces__util_images_show(image_phi, image_height, image_width, 1);
-        
-        % Weights
-        weights = eigenfaces__process_weights(database_eigenfaces, image_phi, 1);
-
-        % Distances
-        distances = eigenfaces__process_distances(weights, database_weights);
-        
-        distances_all(i, :) = distances;
-    end
-    
-    % Vectorize minimum distances
-    minimum_distances = min(distances_all');
-    
-    % Take a decision (build results)
-    results_all = [];
-    
-    for i = 1:image_count
-        distances = distances_all(i, :);
-        
-        [closest_weight, closest_index] = min(distances);
-        farthest_weight = max(distances);
-        
-        [is_face, is_match]=eigenfaces__process_matcher(closest_weight, minimum_distances);
-        
-        if is_match == true
-            result = closest_index;
-            
-            fprintf('HIT: %s/%s recognized as subject in set %s/%s\n', sets{i}, set_images{i}, database_sets{closest_index}, database_set_images{closest_index});
-            
-        elseif is_face == true
-            result = 0;
-            
-            fprintf('MISS: %s/%s not found in any set\n', sets{i}, set_images{i});
-        else
-            result = -1;
-            
-            fprintf('ERROR: %s/%s may not be an human face\n', sets{i}, set_images{i});
-        end
-        
-        results_all(i) = result;
-        
-        fprintf('Got weights: closest=%i; farthest=%i\n', closest_weight, farthest_weight);
-    end
+    % Proceed recognition
+    results_all = eigenfaces__process_recognizer(database_sets, database_set_images, database_eigenfaces, database_mean_face, database_weights, images, sets, set_images, image_height, image_width, image_count);
     
     eigenfaces__util_recognition_show(images, database_images, sets, database_sets, results_all, image_height, image_width, image_count);
     
@@ -142,6 +87,18 @@ function eigenfaces__validation(image_max_width, image_max_height, database_sets
     % TODO: validate the quality of implementation
     %  -> error rate
     %  -> speed per recognition unit
+    
+    [sets, set_images, images, image_height, image_width, image_count] = eigenfaces__load_images('validation_set', image_max_width, image_max_height);
+    
+    fprintf('Loaded %i images of %ix%i pixels\n', image_count, image_width, image_height);
+    
+    % Proceed recognition
+    results_all = eigenfaces__process_recognizer(database_sets, database_set_images, database_eigenfaces, database_mean_face, database_weights, images, sets, set_images, image_height, image_width, image_count);
+    
+    % Process error ratio
+    [error_ratio, error_status] = eigenfaces__util_error_ratio(results_all, sets, database_sets, image_count);
+    
+    fprintf('Error ratio of: %f percent (status: %s)\n', error_ratio, error_status);
     
     fprintf('Processing time: %f seconds\n', toc());
     disp('> Validation ended.');
@@ -320,6 +277,92 @@ function [is_face, is_match]=eigenfaces__process_matcher(distance, minimum_dista
         if distance < non_match_threshold
             is_match = true;
         end
+    end
+end
+
+function results_all=eigenfaces__process_recognizer(database_sets, database_set_images, database_eigenfaces, database_mean_face, database_weights, images, sets, set_images, image_height, image_width, image_count)
+    distances_all = [];
+    
+    % Iterate on every image in the recognition set (build distances)
+    for i = 1:image_count
+        image = eigenfaces__util_image_from_vector(images, image_height, image_width, i);
+        
+        % Normalized face vectors: GAMMA(i){n} [GAMMA(1), GAMMA(2), ...]
+        image_gamma = eigenfaces__normalize(image, image_height, image_width, 1);
+
+        % Substracted mean face vectors: PHI(i) [PHI(1), PHI(2), ...]
+        image_phi = eigenfaces__mean_substract(image_gamma, database_mean_face, image_height, image_width, 1);
+
+        % Uncomment this to view PHI images
+        %eigenfaces__util_images_show(image_phi, image_height, image_width, 1);
+        
+        % Weights
+        weights = eigenfaces__process_weights(database_eigenfaces, image_phi, 1);
+
+        % Distances
+        distances = eigenfaces__process_distances(weights, database_weights);
+        
+        distances_all(i, :) = distances;
+    end
+    
+    % Vectorize minimum distances
+    minimum_distances = min(distances_all');
+    
+    % Take a decision (build results)
+    results_all = [];
+    
+    for i = 1:image_count
+        distances = distances_all(i, :);
+        
+        [closest_weight, closest_index] = min(distances);
+        farthest_weight = max(distances);
+        
+        [is_face, is_match]=eigenfaces__process_matcher(closest_weight, minimum_distances);
+        
+        if is_match == true
+            result = closest_index;
+            
+            fprintf('HIT: %s/%s recognized as subject in set %s/%s\n', sets{i}, set_images{i}, database_sets{closest_index}, database_set_images{closest_index});
+            
+        elseif is_face == true
+            result = 0;
+            
+            fprintf('MISS: %s/%s not found in any set\n', sets{i}, set_images{i});
+        else
+            result = -1;
+            
+            fprintf('ERROR: %s/%s may not be an human face\n', sets{i}, set_images{i});
+        end
+        
+        results_all(i) = result;
+        
+        fprintf('Got weights: closest=%i; farthest=%i\n', closest_weight, farthest_weight);
+    end
+end
+
+function [error_ratio, error_status]=eigenfaces__util_error_ratio(results_all, sets, database_sets, image_count)
+    error_ratio_threshold = 5;
+    error_count = 0;
+    
+    % Find errors
+    for i = 1:image_count
+        result = results_all(i);
+        
+        % Error?
+        if result <= 0
+            error_count = error_count + 1;
+        elseif sets{i} ~= database_sets{result}
+            error_count = error_count + 1;
+        end
+    end
+    
+    % Process ratio
+    error_ratio = (error_count / image_count) * 100;
+    
+    if error_ratio >= error_ratio_threshold
+        error_status = 'bad';
+    else
+        error_status = 'good';
     end
 end
 
