@@ -11,7 +11,7 @@ Face recognition algorithm implementation, using the eigenfaces technique.
 
  1. Open MATLAB
  2. Source the `eigenfaces.m` script in its base directory
- 3. Play the script (the processing and recognition will be automatically launched)
+ 3. Play the script (the processing, recognition and validation will be automatically launched sequentially)
 
 # References
 
