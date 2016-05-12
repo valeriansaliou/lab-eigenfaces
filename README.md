@@ -13,6 +13,10 @@ Face recognition algorithm implementation, using the eigenfaces technique.
  2. Source the `eigenfaces.m` script in its base directory
  3. Play the script (the processing, recognition and validation will be automatically launched sequentially)
 
+# Preview
+
+![Eigenfaces Recognition Results](https://valeriansaliou.github.io/lab-eigenfaces/images/recognition-results.png)
+
 # References
 
 Some links that might help understand the technique and its implementation:
